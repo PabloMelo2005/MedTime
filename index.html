@@ -13,12 +13,16 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 </head>
+<script>
+    if (typeof navigation.serviceWorker !== 'undefined') {
+        navigator.serviceWorker.register('pwabuilder-sw.js')
+    }
+</script>
 
 <body>
 
     <div class="app-container">
 
-        <!-- Tela 1: Splash Screen (Agora vai para Seleção de Perfil) -->
         <div id="initial-screen" class="screen" style="display: flex;">
             <div class="logo-container">
                 <div class="logo"><i class="ph ph-pill"></i></div>
@@ -27,18 +31,15 @@
             </div>
         </div>
 
-        <!-- Tela 2: Seleção de Perfil (Substitui o Login) -->
         <div id="profile-selection-screen" class="screen profile-screen">
             <h2>Quem está usando?</h2>
             <div id="profile-list">
-                <!-- Perfis existentes serão inseridos aqui -->
             </div>
             <button id="btn-go-to-new-profile" class="btn btn-primary">
                 <i class="ph ph-plus-circle"></i> Novo Perfil
             </button>
         </div>
 
-        <!-- Tela 3: Novo Perfil (Substitui o Cadastro) -->
         <div id="new-profile-screen" class="screen auth-screen">
             <h2>Novo Perfil</h2>
             <p class="subtitle">Insira o nome completo do utilizador.</p>
@@ -52,7 +53,6 @@
             </div>
         </div>
 
-        <!-- Tela 4: Principal (Início) -->
         <div id="main-screen" class="screen">
             <div class="main-header">
                 <p>MedTime de:</p>
@@ -60,7 +60,6 @@
                 <p class="subtitle" id="meds-today-count">Para o dia de hoje, você possui 3 medicamentos.</p>
             </div>
             <div id="reminders-list">
-                <!-- Cards de lembretes serão inseridos aqui -->
             </div>
 
             <div id="no-reminders" style="display: none;">
@@ -79,9 +78,9 @@
             </div>
         </div>
 
-        <!-- Tela 5: Novo Medicamento (Com Data da Receita) -->
         <div id="new-med-screen" class="screen">
-            <h2>Insira os dados do novo medicamento</h2>
+            <h2 id="new-med-title">Insira os dados do novo medicamento</h2>
+
             <div class="input-group">
                 <label for="med-name">Nome</label>
                 <input type="text" id="med-name" placeholder="Ex: Sinvastatina">
@@ -92,14 +91,14 @@
             </div>
             <div class="input-group">
                 <label for="med-quantity">Quantidade</label>
-                <input type="number" id="med-quantity" placeholder="Ex: 1">
+                <input type="number" id="med-quantity" placeholder="Insira a quantidade de medicamentos">
             </div>
-            <!-- NOVO CAMPO: Data da Receita -->
             <div class="input-group">
                 <label for="med-prescription-date">Data da Receita (Opcional)</label>
                 <input type="date" id="med-prescription-date">
             </div>
-            <div class_input-group">
+
+            <div class="input-group">
                 <label for="med-frequency">Frequência</label>
                 <select id="med-frequency">
                     <option value="daily">Todos os dias</option>
@@ -114,11 +113,9 @@
             </div>
         </div>
 
-        <!-- Tela 6: Histórico -->
         <div id="history-screen" class="screen">
             <h2>Medicamentos tomados hoje:</h2>
             <div id="history-list">
-                <!-- Itens do histórico aqui -->
             </div>
             <p id="no-history" style="display: none;">Nenhum medicamento foi tomado hoje.</p>
             <button id="btn-history-return" class="btn btn-secondary" style="margin-top: 2rem;">Retornar</button>
@@ -126,7 +123,6 @@
 
     </div>
 
-    <!-- Modal de Alerta -->
     <div id="alarm-modal" class="modal-overlay">
         <div class="modal-content">
             <h2>ALERTA!</h2>
@@ -155,6 +151,7 @@
 
                 let notificationInterval;
                 let currentAlarmReminder = null;
+                let editingReminderIndex = null; // NOVO: Para rastrear a edição
 
                 // --- Seleção de Elementos ---
                 const screens = document.querySelectorAll('.screen');
@@ -189,8 +186,11 @@
                 const medNameInput = document.getElementById('med-name');
                 const medTimeInput = document.getElementById('med-time');
                 const medQuantityInput = document.getElementById('med-quantity');
-                const medPrescriptionDateInput = document.getElementById('med-prescription-date'); // NOVO
+                const medPrescriptionDateInput = document.getElementById('med-prescription-date');
                 const medFrequencyInput = document.getElementById('med-frequency');
+
+                // NOVO: Seleção de elementos do formulário de medicação
+                const newMedTitle = document.getElementById('new-med-title');
 
                 const alarmModal = document.getElementById('alarm-modal');
                 const btnCloseModal = document.getElementById('btn-close-modal');
@@ -255,6 +255,9 @@
                     } else {
                         noRemindersMessage.style.display = 'none';
 
+                        // NOVO: Ordenar lembretes por horário
+                        profileReminders.sort((a, b) => a.time.localeCompare(b.time));
+
                         profileReminders.forEach((reminder, index) => {
                             totalDosesToday++;
                             const card = document.createElement('div');
@@ -263,6 +266,7 @@
                             const isTaken = todayHistory.some(h => h.id === reminder.id && h.time === reminder.time);
                             if (isTaken) card.classList.add('taken');
 
+                            // NOVO: Adicionado botão de editar
                             card.innerHTML = `
                                 <div class="info">
                                     <h3>${reminder.name}</h3>
@@ -271,6 +275,7 @@
                                 </div>
                                 <div class="actions">
                                     ${isTaken ? '<i class="ph ph-check-circle taken-icon"></i>' : ''}
+                                    <button class="edit-btn" data-index="${index}"><i class="ph ph-pencil-simple"></i></button>
                                     <button class="delete-btn" data-index="${index}"><i class="ph ph-trash"></i></button>
                                 </div>
                             `;
@@ -352,6 +357,47 @@
                     }
                 }
 
+                // --- NOVO: Funções de Edição ---
+
+                /** Reseta o formulário de medicação para o estado inicial (Novo) */
+                function resetNewMedForm() {
+                    editingReminderIndex = null;
+
+                    // Limpa os campos
+                    medNameInput.value = '';
+                    medTimeInput.value = '';
+                    medQuantityInput.value = '';
+                    medPrescriptionDateInput.value = '';
+                    medFrequencyInput.value = 'daily';
+
+                    // Restaura os textos
+                    newMedTitle.textContent = 'Insira os dados do novo medicamento';
+                    btnSaveNewMed.textContent = 'Salvar';
+                }
+
+                /** Inicia a edição de um lembrete */
+                function startEditingReminder(index) {
+                    editingReminderIndex = index;
+                    const profileReminders = reminders[currentProfileId] || [];
+                    const reminder = profileReminders[index];
+
+                    if (!reminder) return;
+
+                    // Preenche o formulário
+                    medNameInput.value = reminder.name;
+                    medTimeInput.value = reminder.time;
+                    medQuantityInput.value = reminder.quantity;
+                    medPrescriptionDateInput.value = reminder.prescriptionDate || '';
+                    medFrequencyInput.value = reminder.frequency || 'daily';
+
+                    // Altera a tela de "Novo" para "Editar"
+                    newMedTitle.textContent = 'Altere os dados do medicamento';
+                    btnSaveNewMed.textContent = 'Atualizar';
+
+                    navigateTo('new-med-screen');
+                }
+
+
                 // --- Funções de Gestão de Perfil ---
                 function selectProfile(profileId) {
                     currentProfileId = profileId;
@@ -417,41 +463,69 @@
                 btnSaveNewProfile.addEventListener('click', saveNewProfile);
                 btnSwitchProfile.addEventListener('click', switchProfile);
 
-                btnAddNewMed.addEventListener('click', () => navigateTo('new-med-screen'));
-                btnCancelNewMed.addEventListener('click', () => navigateTo('main-screen'));
+                btnAddNewMed.addEventListener('click', () => {
+                    resetNewMedForm(); // NOVO: Garante que o formulário está limpo
+                    navigateTo('new-med-screen');
+                });
+                btnCancelNewMed.addEventListener('click', () => {
+                    resetNewMedForm(); // NOVO: Limpa o estado de edição
+                    navigateTo('main-screen');
+                });
 
+                // --- LÓGICA ATUALIZADA (SALVAR/EDITAR) ---
                 btnSaveNewMed.addEventListener('click', () => {
                     const name = medNameInput.value.trim();
                     const time = medTimeInput.value;
                     const quantity = medQuantityInput.value;
-                    const prescriptionDate = medPrescriptionDateInput.value; // NOVO
+                    const prescriptionDate = medPrescriptionDateInput.value;
+                    const frequency = medFrequencyInput.value; // NOVO: Lendo a frequência
 
                     if (name && time && quantity) {
                         if (!reminders[currentProfileId]) reminders[currentProfileId] = [];
 
-                        reminders[currentProfileId].push({
-                            id: Date.now(),
+                        const reminderData = {
                             name,
                             time,
                             quantity,
-                            prescriptionDate // NOVO
-                        });
+                            prescriptionDate,
+                            frequency // NOVO: Salvando a frequência
+                        };
+
+                        if (editingReminderIndex !== null) {
+                            // --- Modo de Edição ---
+                            const originalReminder = reminders[currentProfileId][editingReminderIndex];
+                            reminderData.id = originalReminder.id; // Mantém o ID original
+
+                            reminders[currentProfileId][editingReminderIndex] = reminderData;
+                        } else {
+                            // --- Modo Novo ---
+                            reminderData.id = Date.now(); // Cria um novo ID
+                            reminders[currentProfileId].push(reminderData);
+                        }
+
                         saveReminders();
                         renderMainScreen();
                         navigateTo('main-screen');
 
-                        medNameInput.value = '';
-                        medTimeInput.value = '';
-                        medQuantityInput.value = '';
-                        medPrescriptionDateInput.value = ''; // NOVO
+                        resetNewMedForm(); // Limpa o formulário e o estado de edição
+
                     } else {
                         alert('Por favor, preencha nome, horário e quantidade.');
                     }
                 });
 
+
+                // --- LÓGICA ATUALIZADA (EDITAR/DELETAR) ---
                 remindersList.addEventListener('click', (e) => {
                     const deleteButton = e.target.closest('.delete-btn');
-                    if (deleteButton) {
+                    const editButton = e.target.closest('.edit-btn'); // NOVO
+
+                    if (editButton) {
+                        const index = editButton.getAttribute('data-index');
+                        startEditingReminder(index);
+                    }
+
+                    else if (deleteButton) {
                         const index = deleteButton.getAttribute('data-index');
                         if (confirm(`Tem certeza que deseja excluir este lembrete?`)) {
                             reminders[currentProfileId].splice(index, 1);
@@ -500,9 +574,9 @@
             } catch (error) {
                 console.error("Ocorreu um erro ao iniciar o aplicativo:", error);
                 document.body.innerHTML = `<div style="padding: 20px; text-align: center; font-family: sans-serif;">
-                    <h1>Ocorreu um erro</h1><p>Houve um problema ao carregar o MedTime. Por favor, tente recarregar a página.</p>
-                    <p style="color: grey; font-size: 0.8em;">Detalhes: ${error.message}</p>
-                </div>`;
+                        <h1>Ocorreu um erro</h1><p>Houve um problema ao carregar o MedTime. Por favor, tente recarregar a página.</p>
+                        <p style="color: grey; font-size: 0.8em;">Detalhes: ${error.message}</p>
+                    </div>`;
             }
         });
     </script>

@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
+    <title>MedTime</title>
+    <meta name="description" content="Seu assistente para lembretes de medicamentos.">
+    <meta name="theme-color" content="#E0F2F1" />
+    <link rel="manifest" href="manifest.json">
+
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+</head>
+
+<body>
+
+    <div class="app-container">
+
+        <!-- Tela 1: Splash Screen (Agora vai para Seleção de Perfil) -->
+        <div id="initial-screen" class="screen" style="display: flex;">
+            <div class="logo-container">
+                <div class="logo"><i class="ph ph-pill"></i></div>
+                <h1>MedTime</h1>
+                <p>O seu assistente de medicação</p>
+            </div>
+        </div>
+
+        <!-- Tela 2: Seleção de Perfil (Substitui o Login) -->
+        <div id="profile-selection-screen" class="screen profile-screen">
+            <h2>Quem está usando?</h2>
+            <div id="profile-list">
+                <!-- Perfis existentes serão inseridos aqui -->
+            </div>
+            <button id="btn-go-to-new-profile" class="btn btn-primary">
+                <i class="ph ph-plus-circle"></i> Novo Perfil
+            </button>
+        </div>
+
+        <!-- Tela 3: Novo Perfil (Substitui o Cadastro) -->
+        <div id="new-profile-screen" class="screen auth-screen">
+            <h2>Novo Perfil</h2>
+            <p class="subtitle">Insira o nome completo do utilizador.</p>
+            <div class="input-group">
+                <label for="profile-name">Nome Completo</label>
+                <input type="text" id="profile-name" placeholder="Ex: Maria da Silva">
+            </div>
+            <div class="btn-group">
+                <button id="btn-cancel-new-profile" class="btn btn-secondary">Voltar</button>
+                <button id="btn-save-new-profile" class="btn btn-primary">Salvar Perfil</button>
+            </div>
+        </div>
+
+        <!-- Tela 4: Principal (Início) -->
+        <div id="main-screen" class="screen">
+            <div class="main-header">
+                <p>MedTime de:</p>
+                <h2 id="user-name-display">USER</h2>
+                <p class="subtitle" id="meds-today-count">Para o dia de hoje, você possui 3 medicamentos.</p>
+            </div>
+            <div id="reminders-list">
+                <!-- Cards de lembretes serão inseridos aqui -->
+            </div>
+
+            <div id="no-reminders" style="display: none;">
+                <p>Nenhum medicamento cadastrado.</p>
+                <p>Clique em <i class="ph ph-plus"></i> para adicionar.</p>
+            </div>
+
+            <div class="fab-container">
+                <button id="btn-switch-profile" class="fab danger" title="Trocar Perfil"><i
+                        class="ph ph-users"></i></button>
+                <button id="btn-test-alarm" class="fab secondary" title="Testar Alarme"><i
+                        class="ph ph-bell"></i></button>
+                <button id="btn-go-to-history" class="fab secondary" title="Histórico"><i
+                        class="ph ph-clipboard-text"></i></button>
+                <button id="btn-add-new-med" class="fab" title="Novo Medicamento"><i class="ph ph-plus"></i></button>
+            </div>
+        </div>
+
+        <!-- Tela 5: Novo Medicamento (Com Data da Receita) -->
+        <div id="new-med-screen" class="screen">
+            <h2>Insira os dados do novo medicamento</h2>
+            <div class="input-group">
+                <label for="med-name">Nome</label>
+                <input type="text" id="med-name" placeholder="Ex: Sinvastatina">
+            </div>
+            <div class="input-group">
+                <label for="med-time">Horário</label>
+                <input type="time" id="med-time">
+            </div>
+            <div class="input-group">
+                <label for="med-quantity">Quantidade</label>
+                <input type="number" id="med-quantity" placeholder="Ex: 1">
+            </div>
+            <!-- NOVO CAMPO: Data da Receita -->
+            <div class="input-group">
+                <label for="med-prescription-date">Data da Receita (Opcional)</label>
+                <input type="date" id="med-prescription-date">
+            </div>
+            <div class_input-group">
+                <label for="med-frequency">Frequência</label>
+                <select id="med-frequency">
+                    <option value="daily">Todos os dias</option>
+                    <option value="every_12h">A cada 12 horas</option>
+                    <option value="every_8h">A cada 8 horas</option>
+                    <option value="every_6h">A cada 6 horas</option>
+                </select>
+            </div>
+            <div class="btn-group">
+                <button id="btn-cancel-new-med" class="btn btn-secondary">Cancelar</button>
+                <button id="btn-save-new-med" class="btn btn-primary">Salvar</button>
+            </div>
+        </div>
+
+        <!-- Tela 6: Histórico -->
+        <div id="history-screen" class="screen">
+            <h2>Medicamentos tomados hoje:</h2>
+            <div id="history-list">
+                <!-- Itens do histórico aqui -->
+            </div>
+            <p id="no-history" style="display: none;">Nenhum medicamento foi tomado hoje.</p>
+            <button id="btn-history-return" class="btn btn-secondary" style="margin-top: 2rem;">Retornar</button>
+        </div>
+
+    </div>
+
+    <!-- Modal de Alerta -->
+    <div id="alarm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>ALERTA!</h2>
+            <p>Hora de tomar seu medicamento,</p>
+            <p id="alarm-user-name">USER!</p>
+            <br>
+            <p>NOME: <span class="med-info" id="alarm-med-name">Sinvastatina</span></p>
+            <p>QUANTIDADE: <span class="med-info" id="alarm-med-quantity">1</span></p>
+
+            <div class="btn-group-modal">
+                <button id="btn-close-modal" class="btn-close-modal">Fechar</button>
+                <button id="btn-mark-as-taken" class="btn btn-primary btn-modal-taken">Tomei</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                // --- Estado da Aplicação (Agora baseado em Perfis) ---
+                let profiles = JSON.parse(localStorage.getItem('medTimeProfiles')) || [];
+                let currentProfileId = localStorage.getItem('medTimeCurrentProfileId') || null;
+                let reminders = JSON.parse(localStorage.getItem('medTimeReminders')) || {};
+                let history = JSON.parse(localStorage.getItem('medTimeHistory')) || {};
+
+                let notificationInterval;
+                let currentAlarmReminder = null;
+
+                // --- Seleção de Elementos ---
+                const screens = document.querySelectorAll('.screen');
+                const initialScreen = document.getElementById('initial-screen');
+                const profileSelectionScreen = document.getElementById('profile-selection-screen');
+                const newProfileScreen = document.getElementById('new-profile-screen');
+                const mainScreen = document.getElementById('main-screen');
+                const newMedScreen = document.getElementById('new-med-screen');
+                const historyScreen = document.getElementById('history-screen');
+
+                const profileList = document.getElementById('profile-list');
+                const btnGoToNewProfile = document.getElementById('btn-go-to-new-profile');
+                const btnSaveNewProfile = document.getElementById('btn-save-new-profile');
+                const btnCancelNewProfile = document.getElementById('btn-cancel-new-profile');
+                const profileNameInput = document.getElementById('profile-name');
+
+                const btnAddNewMed = document.getElementById('btn-add-new-med');
+                const btnSaveNewMed = document.getElementById('btn-save-new-med');
+                const btnCancelNewMed = document.getElementById('btn-cancel-new-med');
+                const btnGoToHistory = document.getElementById('btn-go-to-history');
+                const btnHistoryReturn = document.getElementById('btn-history-return');
+                const btnTestAlarm = document.getElementById('btn-test-alarm');
+                const btnSwitchProfile = document.getElementById('btn-switch-profile');
+
+                const userNameDisplay = document.getElementById('user-name-display');
+                const medsTodayCount = document.getElementById('meds-today-count');
+                const remindersList = document.getElementById('reminders-list');
+                const noRemindersMessage = document.getElementById('no-reminders');
+                const historyList = document.getElementById('history-list');
+                const noHistoryMessage = document.getElementById('no-history');
+
+                const medNameInput = document.getElementById('med-name');
+                const medTimeInput = document.getElementById('med-time');
+                const medQuantityInput = document.getElementById('med-quantity');
+                const medPrescriptionDateInput = document.getElementById('med-prescription-date'); // NOVO
+                const medFrequencyInput = document.getElementById('med-frequency');
+
+                const alarmModal = document.getElementById('alarm-modal');
+                const btnCloseModal = document.getElementById('btn-close-modal');
+                const btnMarkAsTaken = document.getElementById('btn-mark-as-taken');
+                const alarmUserName = document.getElementById('alarm-user-name');
+
+                // --- Funções Principais ---
+
+                function navigateTo(screenId) {
+                    screens.forEach(screen => screen.style.display = 'none');
+                    const targetScreen = document.getElementById(screenId);
+                    if (targetScreen) {
+                        targetScreen.style.display = 'flex';
+                    }
+                }
+
+                // Funções de salvamento (agora salvam o objeto inteiro)
+                function saveProfiles() {
+                    localStorage.setItem('medTimeProfiles', JSON.stringify(profiles));
+                }
+                function saveReminders() {
+                    localStorage.setItem('medTimeReminders', JSON.stringify(reminders));
+                }
+                function saveHistory() {
+                    localStorage.setItem('medTimeHistory', JSON.stringify(history));
+                }
+
+                // Funções de renderização
+                function renderProfileSelectionScreen() {
+                    profileList.innerHTML = '';
+                    if (profiles.length === 0) {
+                        profileList.innerHTML = '<p class="subtitle">Nenhum perfil encontrado. Crie um novo para começar.</p>';
+                    } else {
+                        profiles.forEach(profile => {
+                            const profileCard = document.createElement('div');
+                            profileCard.className = 'profile-card';
+                            profileCard.textContent = profile.name;
+                            profileCard.onclick = () => selectProfile(profile.id);
+                            profileList.appendChild(profileCard);
+                        });
+                    }
+                }
+
+                function renderMainScreen() {
+                    if (!currentProfileId) return navigateTo('profile-selection-screen');
+
+                    const profile = profiles.find(p => p.id === currentProfileId);
+                    if (!profile) return navigateTo('profile-selection-screen');
+
+                    const profileReminders = reminders[currentProfileId] || [];
+                    const todayKey = new Date().toISOString().split('T')[0];
+                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
+
+                    remindersList.innerHTML = '';
+                    userNameDisplay.textContent = profile.name;
+
+                    let totalDosesToday = 0;
+
+                    if (profileReminders.length === 0) {
+                        noRemindersMessage.style.display = 'block';
+                        medsTodayCount.textContent = 'Você não possui medicamentos cadastrados.';
+                    } else {
+                        noRemindersMessage.style.display = 'none';
+
+                        profileReminders.forEach((reminder, index) => {
+                            totalDosesToday++;
+                            const card = document.createElement('div');
+                            card.className = 'reminder-card';
+
+                            const isTaken = todayHistory.some(h => h.id === reminder.id && h.time === reminder.time);
+                            if (isTaken) card.classList.add('taken');
+
+                            card.innerHTML = `
+                                <div class="info">
+                                    <h3>${reminder.name}</h3>
+                                    <p>Horário: ${reminder.time} - Qtd: ${reminder.quantity}</p>
+                                    ${reminder.prescriptionDate ? `<p class="prescription-date">Receita de: ${new Date(reminder.prescriptionDate).toLocaleDateString()}</p>` : ''}
+                                </div>
+                                <div class="actions">
+                                    ${isTaken ? '<i class="ph ph-check-circle taken-icon"></i>' : ''}
+                                    <button class="delete-btn" data-index="${index}"><i class="ph ph-trash"></i></button>
+                                </div>
+                            `;
+                            remindersList.appendChild(card);
+                        });
+
+                        const takenCount = todayHistory.length;
+                        medsTodayCount.textContent = `Tomados hoje: ${takenCount} de ${totalDosesToday}`;
+                    }
+                }
+
+                function renderHistoryScreen() {
+                    if (!currentProfileId) return navigateTo('profile-selection-screen');
+
+                    historyList.innerHTML = '';
+                    const todayKey = new Date().toISOString().split('T')[0];
+                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
+
+                    if (todayHistory.length === 0) {
+                        noHistoryMessage.style.display = 'block';
+                    } else {
+                        noHistoryMessage.style.display = 'none';
+                        const grouped = todayHistory.reduce((acc, dose) => {
+                            acc[dose.name] = (acc[dose.name] || 0) + 1;
+                            return acc;
+                        }, {});
+
+                        for (const name in grouped) {
+                            const count = grouped[name];
+                            const item = document.createElement('div');
+                            item.className = 'history-item';
+                            item.innerHTML = `
+                                <h3>${name}</h3>
+                                <p>Remédios tomados: ${count}</p>
+                            `;
+                            historyList.appendChild(item);
+                        }
+                    }
+                }
+
+                function showAlarm(reminder) {
+                    currentAlarmReminder = reminder;
+                    const profile = profiles.find(p => p.id === currentProfileId);
+                    alarmUserName.textContent = profile ? profile.name + '!' : 'USER!';
+                    document.getElementById('alarm-med-name').textContent = reminder.name;
+                    document.getElementById('alarm-med-quantity').textContent = reminder.quantity;
+                    alarmModal.style.display = 'flex';
+                }
+
+                function checkReminders() {
+                    if (!currentProfileId) return; // Não faz nada se ninguém estiver logado
+
+                    const profileReminders = reminders[currentProfileId] || [];
+                    const now = new Date();
+                    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                    const todayKey = now.toISOString().split('T')[0];
+                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
+
+                    profileReminders.forEach(reminder => {
+                        if (reminder.time === currentTime) {
+                            const alreadyTaken = todayHistory.some(h => h.id === reminder.id && h.time === reminder.time);
+                            if (!alreadyTaken) {
+                                showAlarm(reminder);
+                                if (Notification.permission === 'granted') {
+                                    const profile = profiles.find(p => p.id === currentProfileId);
+                                    new Notification(`Hora de ${profile.name} tomar ${reminder.name}!`, {
+                                        body: `Tomar ${reminder.quantity} comprimido(s).`,
+                                        icon: 'https://placehold.co/192x192/00695C/FFFFFF?text=MT'
+                                    });
+                                }
+                            }
+                        }
+                    });
+                }
+
+                function requestNotificationPermission() {
+                    if ('Notification' in window && Notification.permission !== 'granted') {
+                        Notification.requestPermission();
+                    }
+                }
+
+                // --- Funções de Gestão de Perfil ---
+                function selectProfile(profileId) {
+                    currentProfileId = profileId;
+                    localStorage.setItem('medTimeCurrentProfileId', profileId);
+                    navigateTo('main-screen');
+                    renderMainScreen();
+                }
+
+                function saveNewProfile() {
+                    const name = profileNameInput.value.trim();
+                    if (name) {
+                        const newProfile = {
+                            id: Date.now().toString(),
+                            name: name
+                        };
+                        profiles.push(newProfile);
+                        saveProfiles();
+
+                        // Inicializa dados para o novo perfil
+                        reminders[newProfile.id] = [];
+                        history[newProfile.id] = {};
+                        saveReminders();
+                        saveHistory();
+
+                        profileNameInput.value = '';
+                        selectProfile(newProfile.id);
+                    } else {
+                        alert('Por favor, insira um nome.');
+                    }
+                }
+
+                function switchProfile() {
+                    currentProfileId = null;
+                    localStorage.removeItem('medTimeCurrentProfileId');
+                    navigateTo('profile-selection-screen');
+                    renderProfileSelectionScreen();
+                }
+
+                // --- Lógica de Inicialização ---
+                function setupApp() {
+                    // Simula o splash screen por 1.5s
+                    setTimeout(() => {
+                        if (currentProfileId && profiles.find(p => p.id === currentProfileId)) {
+                            navigateTo('main-screen');
+                            renderMainScreen();
+                        } else {
+                            navigateTo('profile-selection-screen');
+                            renderProfileSelectionScreen();
+                        }
+                    }, 1500);
+
+                    if (notificationInterval) clearInterval(notificationInterval);
+                    notificationInterval = setInterval(checkReminders, 60000);
+                }
+
+                // --- Event Listeners (Ações do Usuário) ---
+
+                btnGoToNewProfile.addEventListener('click', () => navigateTo('new-profile-screen'));
+                btnCancelNewProfile.addEventListener('click', () => {
+                    navigateTo('profile-selection-screen');
+                    renderProfileSelectionScreen();
+                });
+                btnSaveNewProfile.addEventListener('click', saveNewProfile);
+                btnSwitchProfile.addEventListener('click', switchProfile);
+
+                btnAddNewMed.addEventListener('click', () => navigateTo('new-med-screen'));
+                btnCancelNewMed.addEventListener('click', () => navigateTo('main-screen'));
+
+                btnSaveNewMed.addEventListener('click', () => {
+                    const name = medNameInput.value.trim();
+                    const time = medTimeInput.value;
+                    const quantity = medQuantityInput.value;
+                    const prescriptionDate = medPrescriptionDateInput.value; // NOVO
+
+                    if (name && time && quantity) {
+                        if (!reminders[currentProfileId]) reminders[currentProfileId] = [];
+
+                        reminders[currentProfileId].push({
+                            id: Date.now(),
+                            name,
+                            time,
+                            quantity,
+                            prescriptionDate // NOVO
+                        });
+                        saveReminders();
+                        renderMainScreen();
+                        navigateTo('main-screen');
+
+                        medNameInput.value = '';
+                        medTimeInput.value = '';
+                        medQuantityInput.value = '';
+                        medPrescriptionDateInput.value = ''; // NOVO
+                    } else {
+                        alert('Por favor, preencha nome, horário e quantidade.');
+                    }
+                });
+
+                remindersList.addEventListener('click', (e) => {
+                    const deleteButton = e.target.closest('.delete-btn');
+                    if (deleteButton) {
+                        const index = deleteButton.getAttribute('data-index');
+                        if (confirm(`Tem certeza que deseja excluir este lembrete?`)) {
+                            reminders[currentProfileId].splice(index, 1);
+                            saveReminders();
+                            renderMainScreen();
+                        }
+                    }
+                });
+
+                btnGoToHistory.addEventListener('click', () => {
+                    renderHistoryScreen();
+                    navigateTo('history-screen');
+                });
+                btnHistoryReturn.addEventListener('click', () => navigateTo('main-screen'));
+
+                btnTestAlarm.addEventListener('click', () => {
+                    showAlarm({ id: 'test', name: 'Medicamento Teste', quantity: '1', time: '00:00' });
+                });
+                btnCloseModal.addEventListener('click', () => {
+                    alarmModal.style.display = 'none';
+                    currentAlarmReminder = null;
+                });
+
+                btnMarkAsTaken.addEventListener('click', () => {
+                    if (currentAlarmReminder && currentProfileId) {
+                        const todayKey = new Date().toISOString().split('T')[0];
+
+                        if (!history[currentProfileId]) history[currentProfileId] = {};
+                        if (!history[currentProfileId][todayKey]) history[currentProfileId][todayKey] = [];
+
+                        history[currentProfileId][todayKey].push({
+                            ...currentAlarmReminder,
+                            takenAt: new Date().toISOString()
+                        });
+                        saveHistory();
+                        renderMainScreen();
+                    }
+                    alarmModal.style.display = 'none';
+                    currentAlarmReminder = null;
+                });
+
+                // Inicia o aplicativo
+                setupApp();
+                requestNotificationPermission();
+
+            } catch (error) {
+                console.error("Ocorreu um erro ao iniciar o aplicativo:", error);
+                document.body.innerHTML = `<div style="padding: 20px; text-align: center; font-family: sans-serif;">
+                    <h1>Ocorreu um erro</h1><p>Houve um problema ao carregar o MedTime. Por favor, tente recarregar a página.</p>
+                    <p style="color: grey; font-size: 0.8em;">Detalhes: ${error.message}</p>
+                </div>`;
+            }
+        });
+    </script>
+</body>
+
+</html>

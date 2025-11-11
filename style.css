@@ -343,14 +343,29 @@ i.ph {
     align-items: center;
 }
 
+/* NOVO: Estilos para botões de ação (Editar e Deletar) */
+.reminder-card .actions .edit-btn,
 .reminder-card .actions .delete-btn {
     background: none;
     border: none;
-    color: var(--danger-red);
     font-size: 1.5rem;
     cursor: pointer;
-    margin-left: 1rem;
+    margin-left: 0.75rem; /* Espaçamento entre ícones */
+    transition: transform 0.2s;
 }
+.reminder-card .actions .edit-btn:active,
+.reminder-card .actions .delete-btn:active {
+    transform: scale(0.9);
+}
+
+.reminder-card .actions .edit-btn {
+    color: var(--secondary-color); /* Verde claro */
+}
+
+.reminder-card .actions .delete-btn {
+    color: var(--danger-red);
+}
+
 
 .reminder-card .actions .taken-icon {
     font-size: 1.5rem;
@@ -406,6 +421,24 @@ i.ph {
 #new-med-screen {
     justify-content: flex-start;
 }
+
+/* REMOVIDOS ESTILOS ANTIGOS E COM ERROS:
+   #med-frequency { ... }
+   #opcao_frequencia { ... }
+*/
+
+/* NOVO: Estilo para aumentar a fonte da Frequência */
+#new-med-screen .input-group label[for="med-frequency"],
+#new-med-screen .input-group #med-frequency {
+    font-size: 1.2rem; /* Fonte aumentada */
+    font-weight: 500;
+}
+
+/* Garante que o select tenha o mesmo padding dos outros inputs */
+#new-med-screen .input-group #med-frequency {
+    padding: 0.8rem 1rem; 
+}
+
 
 #new-med-screen h2 {
     font-size: 1.8rem;
