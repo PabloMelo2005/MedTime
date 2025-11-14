@@ -460,6 +460,7 @@
                 const btnMarkAsTaken = document.getElementById('btn-mark-as-taken');
 
                 const alarmUserName = document.getElementById('alarm-user-name');
+                const VAPID_PUBLIC_KEY = 'BC0r1sXwBXVzvAYPV_NMXpf2a4YKcvfQhtVZYnmax-5xo-k_W3dldhHEECO2f8Aiku9jf24LXc11oN3SDEOf82PP';
 
 
 
@@ -496,6 +497,20 @@
                 function saveHistory() { localStorage.setItem('medTimeHistory', JSON.stringify(history)); }
 
                 function savePushEnabled() { localStorage.setItem('medTimePushEnabled', JSON.stringify(pushEnabled)); }
+
+                function urlBase64ToUint8Array(base64String) {
+                    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+                    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+                    const rawData = window.atob(base64);
+                    const outputArray = new Uint8Array(rawData.length);
+                    for (let i = 0; i < rawData.length; ++i) {
+                        outputArray[i] = rawData.charCodeAt(i);
+                    }
+                    return outputArray;
+                }
+
+
+
 
                 function renderProfileSelectionScreen() { /* ... (sem alteração) ... */
 
@@ -773,66 +788,73 @@
 
                 }
 
-                async function handlePushSubscription(enable) { /* ... (sem alteração) ... */
-
+                async function handlePushSubscription(enable) {
                     togglePushNotifications.checked = pushEnabled;
 
                     if (enable) {
-
-                        if (!('Notification' in window) || !('serviceWorker' in navigator)) {
-
-                            alert('Seu navegador não suporta notificações ou Service Workers. A função não pode ser ativada.');
-
+                        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+                            alert('Seu navegador não suporta Notificações Push.');
                             pushEnabled = false;
-
                             togglePushNotifications.checked = false;
-
                             savePushEnabled();
-
                             return;
-
                         }
 
                         try {
-
                             const permission = await Notification.requestPermission();
-
                             if (permission === 'granted') {
-
-                                console.log('Permissão de notificação concedida.');
-
+                                console.log('Permissão concedida. Obtendo inscrição...');
                                 pushEnabled = true;
 
+                                const reg = await navigator.serviceWorker.ready;
+                                let subscription = await reg.pushManager.getSubscription();
+
+                                if (subscription === null) {
+                                    // Se não houver inscrição, crie uma nova
+                                    console.log('Criando nova inscrição...');
+                                    const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+
+                                    subscription = await reg.pushManager.subscribe({
+                                        userVisibleOnly: true,
+                                        applicationServerKey: convertedKey // A chave pública
+                                    });
+                                }
+
+                                console.log('Inscrição obtida:', JSON.stringify(subscription));
+
+                                // --- IMPORTANTE ---
+                                // Salvamos a inscrição no localStorage para usar depois
+                                localStorage.setItem('medTimePushSubscription', JSON.stringify(subscription));
+                                alert('Notificações ativadas! A inscrição foi salva.');
+
                             } else {
-
                                 console.warn('Permissão de notificação negada.');
-
                                 pushEnabled = false;
-
                             }
-
                         } catch (error) {
-
-                            console.error('Erro ao pedir permissão de notificação:', error);
-
+                            console.error('Erro ao pedir permissão ou inscrição:', error);
                             pushEnabled = false;
-
                         }
 
                     } else {
-
-                        console.log('Notificações Push desativadas pelo usuário nas configurações do app.');
-
+                        // Lógica para desativar (remover inscrição)
+                        console.log('Desativando notificações...');
                         pushEnabled = false;
-
+                        try {
+                            const reg = await navigator.serviceWorker.ready;
+                            const subscription = await reg.pushManager.getSubscription();
+                            if (subscription) {
+                                await subscription.unsubscribe();
+                                localStorage.removeItem('medTimePushSubscription');
+                                console.log('Inscrição removida.');
+                            }
+                        } catch (e) {
+                            console.error('Erro ao remover inscrição:', e);
+                        }
                     }
-
                     savePushEnabled();
-
                     togglePushNotifications.checked = pushEnabled;
-
                 }
-
                 function resetNewMedForm() { /* ... (sem alteração) ... */
 
                     editingReminderIndex = null;
@@ -1119,10 +1141,48 @@
 
                 });
 
-                btnTestAlarm.addEventListener('click', () => {
+                btnTestAlarm.addEventListener('click', async () => {
+                    console.log('Testando alarme via Servidor Push...');
 
-                    showAlarm({ id: 'test', name: 'Medicamento Teste', quantity: '1', time: '00:00' });
+                    // 1. Pega a inscrição que salvamos no localStorage (no Passo 6)
+                    const subscriptionString = localStorage.getItem('medTimePushSubscription');
+                    if (!subscriptionString) {
+                        alert('Inscrição de push não encontrada.\n\nPor favor, ative as notificações nas Configurações primeiro e tente novamente.');
+                        return;
+                    }
 
+                    const subscription = JSON.parse(subscriptionString);
+
+                    // 2. Prepara os dados do remédio (o payload)
+                    const payload = {
+                        name: 'Medicamento Teste',
+                        quantity: '1'
+                    };
+
+                    // 3. Envia para o backend (a Netlify Function que criamos no Passo 5)
+                    try {
+                        // O Netlify expõe a função em /.netlify/functions/[nome-do-arquivo]
+                        const response = await fetch('/.netlify/functions/send-push', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            // Envia a inscrição E o payload
+                            body: JSON.stringify({ subscription, payload })
+                        });
+
+                        const data = await response.json();
+                        if (response.ok) {
+                            alert('Sinal de push enviado com sucesso!\n\nVocê deve receber uma notificação em segundos. (Pode fechar o app para testar!)');
+                            console.log('Sucesso do backend:', data.message);
+                        } else {
+                            throw new Error(data.message || 'Erro do backend');
+                        }
+
+                    } catch (error) {
+                        console.error('Erro ao enviar sinal de push:', error);
+                        alert('Falha ao contatar o servidor de push. Veja o console para detalhes.');
+                    }
                 });
 
                 btnCloseModal.addEventListener('click', () => {
