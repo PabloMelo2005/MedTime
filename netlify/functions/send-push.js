@@ -9,7 +9,7 @@ const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 // Configura a biblioteca web-push
 // (Troque 'mailto:seu-email@exemplo.com' pelo seu email)
 webpush.setVapidDetails(
-    'mailto:seu-email@exemplo.com',
+    'pablobertoldo.melo@gmail.com',
     vapidPublicKey,
     vapidPrivateKey
 );
