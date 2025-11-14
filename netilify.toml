@@ -1,0 +1,11 @@
+# Arquivo: netlify.toml
+
+[build]
+  # Comando para "buildar" seu site (se não houver, pode deixar assim)
+  command = "echo 'Sem build'"
+  
+  # Pasta onde está seu index.html, style.css, etc.
+  publish = "." 
+
+  # Pasta onde vamos criar nossas funções de backend
+  functions = "netlify/functions"
