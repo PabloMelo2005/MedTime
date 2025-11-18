@@ -1162,12 +1162,11 @@
                     // 3. Envia para o backend (a Netlify Function que criamos no Passo 5)
                     try {
                         // O Netlify expõe a função em /.netlify/functions/[nome-do-arquivo]
-                        const response = await fetch('/.netlify/functions/send-push', {
+                        const response = await fetch('/api/send-push', {  // <--- ALTERADO AQUI
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'
                             },
-                            // Envia a inscrição E o payload
                             body: JSON.stringify({ subscription, payload })
                         });
 
