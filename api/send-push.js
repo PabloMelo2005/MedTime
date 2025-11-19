@@ -14,8 +14,8 @@ module.exports = async (req, res) => {
 
         // 🔑 Suas chaves VAPID
         const vapidKeys = {
-            publicKey: "BC0r1sXwBXVzvAYPV_NMXpf2a4YKcvfQhtVZYnmax-5xo-k_W3dldhHEECO2f8Aiku9jf24LXc11oN3SDEOf82PP",
-            privateKey: "cwT54ZZRUrwa_RKMJgKChvGvR5MFEu4mwNgyTM31dAk"
+            publicKey: "BN5KpMkY3axPW2irYg6A6tRxnFDhahdATjsyNEHJ5L5fZG4Hveo5gNviteY7p81C8ZH8ecYKTxmm0UO8X-f3TzY",
+            privateKey: "rpOX8hrfFrSOpgZLy7N9_V54OtGgtcKViDjKn1JY7X4"
         };
 
         webpush.setVapidDetails(
