@@ -52,6 +52,7 @@ self.addEventListener('fetch', (event) => {
 // ===================================================================
 
 self.addEventListener('push', event => {
+
   let data = {};
   try {
     data = event.data.json();
@@ -61,24 +62,17 @@ self.addEventListener('push', event => {
   }
 
   const title = `MedTime: Hora de ${data.name || 'seu remédio'}!`;
+
   const options = {
     body: `Tomar ${data.quantity || '1'} comprimido(s).`,
-
-    // --- ÍCONE E SOM (CORRIGIDOS) ---
-
-    // 1. ÍCONE: Caminho está correto de acordo com sua imagem
-    icon: '/AppImages/android/android-launchericon-192-192.png',
-
-    // 2. SOM: Caminho atualizado para /Sounds/ (com "S" maiúsculo)
-    sound: '/Sounds/alarm.mp3', // <--- CORRIGIDO
-
+    icon: 'AppImages/android/android-launchericon-192-192.png',
     vibrate: [200, 100, 200, 100, 200],
-
     actions: [
       { action: 'taken', title: '✅ Tomei' },
       { action: 'snooze', title: '⏰ Adiar 5 min' }
     ],
     tag: 'medtime-reminder'
+    // 'sound' removido (não funciona em browsers)
   };
 
   event.waitUntil(
