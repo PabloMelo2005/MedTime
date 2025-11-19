@@ -331,16 +331,16 @@
                     document.getElementById('alarm-med-quantity').textContent = reminder.quantity;
                     alarmModal.style.display = 'flex';
 
-                    try {
-                        alarmSound.currentTime = 0;
-                        alarmSound.play().catch(error => {
-                            console.warn("Áudio do alarme bloqueado pelo navegador:", error);
-                        });
-                    } catch (e) {
-                        console.error("Erro ao tocar som:", e);
+                    // --- NOVO: Vibração ao invés de som ---
+                    // Verifica se o navegador suporta vibração
+                    if ('vibrate' in navigator) {
+                        // Padrão: Vibra 500ms, Pausa 200ms, Vibra 500ms
+                        navigator.vibrate([500, 200, 500]);
+                        console.log('📳 Vibrando dispositivo...');
+                    } else {
+                        console.log('📳 Este dispositivo não suporta vibração via web.');
                     }
                 }
-
                 function checkReminders() {
                     if (!currentProfileId) return;
                     const profileReminders = reminders[currentProfileId] || [];
