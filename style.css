@@ -1184,6 +1184,119 @@ i.ph {
 
 }
 
+/* --- Estilos para Múltiplos Medicamentos (PADRONIZADO) --- */
+
+#medications-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    /* Espaçamento entre as linhas */
+    margin-bottom: 1rem;
+}
+
+.med-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 48px;
+    /* Nome (maior), Qtd (menor), Botão Delete (fixo) */
+    gap: 0.5rem;
+    align-items: stretch;
+    /* Removemos o fundo branco e borda para ficar limpo */
+}
+
+/* Padronizando os inputs para ficarem IGUAIS aos outros do app */
+.med-row input {
+    width: 100%;
+    padding: 0.8rem 1rem;
+    border: 2px solid transparent;
+    /* Borda invisível para não pular no focus */
+    background-color: var(--gray-bg);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--dark-text);
+    margin-bottom: 0 !important;
+    transition: border-color 0.3s, background-color 0.3s;
+}
+
+.med-row input::placeholder {
+    color: #999;
+    font-size: 0.9rem;
+}
+
+.med-row input:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    background-color: var(--white);
+}
+
+/* Botão de Remover (Lixeira) */
+.btn-remove-row {
+    background-color: #FFEBEE;
+    /* Fundo vermelho muito suave */
+    color: var(--danger-red);
+    border: none;
+    border-radius: 8px;
+    height: auto;
+    /* Preenche a altura da linha */
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    transition: background-color 0.2s, transform 0.1s;
+}
+
+.btn-remove-row:active {
+    background-color: #FFCDD2;
+    transform: scale(0.95);
+}
+
+/* Botão de Adicionar Outro (Padronizado com o tema) */
+.btn-add-row {
+    background-color: var(--primary-color);
+    /* Verde claro do tema */
+    color: var(--white);
+    border: none;
+    padding: 0.9rem;
+    border-radius: 8px;
+    width: 100%;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    font-size: 1rem;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s, transform 0.1s;
+}
+
+.btn-add-row:hover {
+    opacity: 0.9;
+}
+
+.btn-add-row:active {
+    transform: scale(0.98);
+}
+
+/* Ajuste no Modal para lista de remédios */
+.alarm-med-list-item {
+    background: var(--gray-bg);
+    padding: 10px 15px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border-left: 5px solid var(--danger-red);
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1rem;
+}
+
+.alarm-med-list-item strong {
+    color: var(--primary-color);
+    font-size: 1.1rem;
+}
 
 
 /* Explicação da limitação do Push */

@@ -9,14 +9,65 @@
     <meta name="theme-color" content="#E0F2F1" />
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="AppImages/android/android-launchericon-192-192.png">
+
     <link rel="stylesheet" href="style.css">
     <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+
+    <style>
+        .med-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 40px;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .med-row input {
+            margin-bottom: 0 !important;
+        }
+
+        .btn-remove-row {
+            background: #FFEBEE;
+            color: #D32F2F;
+            border: 1px solid #D32F2F;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-add-row {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            background: #4DB6AC;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .alarm-med-list-item {
+            background: white;
+            padding: 8px;
+            border-radius: 4px;
+            margin-bottom: 5px;
+            border-left: 4px solid #D32F2F;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
 </head>
 
 <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('pwabuilder-sw.js')
-            .then(reg => console.log("✅ Service Worker registrado:", reg))
+            .then(reg => console.log("✅ Service Worker registrado"))
             .catch(err => console.error("❌ Erro ao registrar SW:", err));
     }
 </script>
@@ -56,7 +107,7 @@
             <div class="main-header">
                 <p>MedTime de:</p>
                 <h2 id="user-name-display">USER</h2>
-                <p class="subtitle" id="meds-today-count">Para o dia de hoje, você possui 3 medicamentos.</p>
+                <p class="subtitle" id="meds-today-count">Carregando...</p>
             </div>
             <div id="reminders-list"></div>
 
@@ -79,23 +130,26 @@
         </div>
 
         <div id="new-med-screen" class="screen">
-            <h2 id="new-med-title">Insira os dados do novo medicamento</h2>
+            <h2 id="new-med-title">Insira os dados</h2>
+
             <div class="input-group">
-                <label for="med-name">Nome</label>
-                <input type="text" id="med-name" placeholder="Ex: Sinvastatina">
-            </div>
-            <div class="input-group">
-                <label for="med-time">Horário</label>
+                <label for="med-time">Horário do Lembrete</label>
                 <input type="time" id="med-time">
             </div>
-            <div class="input-group">
-                <label for="med-quantity">Quantidade</label>
-                <input type="number" id="med-quantity" placeholder="Insira a quantidade de medicamentos">
+
+            <label style="display:block; margin-bottom:0.5rem; font-weight:500;">Medicamentos</label>
+            <div id="medications-container">
             </div>
+
+            <button type="button" id="btn-add-med-row" class="btn-add-row">
+                <i class="ph ph-plus"></i> Adicionar outro medicamento
+            </button>
+
             <div class="input-group">
                 <label for="med-prescription-date">Data da Receita (Opcional)</label>
                 <input type="date" id="med-prescription-date">
             </div>
+
             <div class="input-group">
                 <label for="med-frequency">Frequência</label>
                 <select id="med-frequency">
@@ -144,10 +198,11 @@
         <div class="modal-content">
             <h2>ALERTA!</h2>
             <p>Hora de tomar seu medicamento,</p>
-            <p id="alarm-user-name">USER!</p>
-            <br>
-            <p>NOME: <span class="med-info" id="alarm-med-name">Sinvastatina</span></p>
-            <p>QUANTIDADE: <span class="med-info" id="alarm-med-quantity">1</span></p>
+            <p id="alarm-user-name" style="font-weight: bold; margin-bottom: 1rem;">USER!</p>
+
+            <div id="alarm-meds-list" style="margin-bottom: 1.5rem; max-height: 200px; overflow-y: auto;">
+            </div>
+
             <div class="btn-group-modal">
                 <button id="btn-close-modal" class="btn-close-modal">Fechar</button>
                 <button id="btn-mark-as-taken" class="btn btn-primary btn-modal-taken">Tomei</button>
@@ -158,7 +213,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             try {
-                // Estado da Aplicação
+                // --- 1. CONFIGURAÇÕES E ESTADO ---
+                const VAPID_PUBLIC_KEY = 'BN5KpMkY3axPW2irYg6A6tRxnFDhahdATjsyNEHJ5L5fZG4Hveo5gNviteY7p81C8ZH8ecYKTxmm0UO8X-f3TzY';
+
                 let profiles = JSON.parse(localStorage.getItem('medTimeProfiles')) || [];
                 let currentProfileId = localStorage.getItem('medTimeCurrentProfileId') || null;
                 let reminders = JSON.parse(localStorage.getItem('medTimeReminders')) || {};
@@ -172,58 +229,51 @@
                 let currentAlarmReminder = null;
                 let editingReminderIndex = null;
 
-                const VAPID_PUBLIC_KEY = 'BN5KpMkY3axPW2irYg6A6tRxnFDhahdATjsyNEHJ5L5fZG4Hveo5gNviteY7p81C8ZH8ecYKTxmm0UO8X-f3TzY';
-
-                // Seleção de Elementos
+                // --- 2. SELEÇÃO DE ELEMENTOS DOM ---
                 const screens = document.querySelectorAll('.screen');
-                const initialScreen = document.getElementById('initial-screen');
-                const profileSelectionScreen = document.getElementById('profile-selection-screen');
-                const newProfileScreen = document.getElementById('new-profile-screen');
-                const mainScreen = document.getElementById('main-screen');
-                const newMedScreen = document.getElementById('new-med-screen');
-                const historyScreen = document.getElementById('history-screen');
-                const settingsScreen = document.getElementById('settings-screen');
+                const profileList = document.getElementById('profile-list');
+                const remindersList = document.getElementById('reminders-list');
+                const historyList = document.getElementById('history-list');
+
+                // Botões
                 const btnGoToSettings = document.getElementById('btn-go-to-settings');
                 const btnSettingsReturn = document.getElementById('btn-settings-return');
                 const togglePushNotifications = document.getElementById('toggle-push-notifications');
-                const profileList = document.getElementById('profile-list');
+                const btnTestAlarm = document.getElementById('btn-test-alarm');
                 const btnGoToNewProfile = document.getElementById('btn-go-to-new-profile');
                 const btnSaveNewProfile = document.getElementById('btn-save-new-profile');
                 const btnCancelNewProfile = document.getElementById('btn-cancel-new-profile');
-                const profileNameInput = document.getElementById('profile-name');
+                const btnSwitchProfile = document.getElementById('btn-switch-profile');
                 const btnAddNewMed = document.getElementById('btn-add-new-med');
                 const btnSaveNewMed = document.getElementById('btn-save-new-med');
                 const btnCancelNewMed = document.getElementById('btn-cancel-new-med');
                 const btnGoToHistory = document.getElementById('btn-go-to-history');
                 const btnHistoryReturn = document.getElementById('btn-history-return');
-                const btnTestAlarm = document.getElementById('btn-test-alarm');
-                const btnSwitchProfile = document.getElementById('btn-switch-profile');
+                const btnAddMedRow = document.getElementById('btn-add-med-row');
+                const btnCloseModal = document.getElementById('btn-close-modal');
+                const btnMarkAsTaken = document.getElementById('btn-mark-as-taken');
+
+                // Inputs e Displays
+                const profileNameInput = document.getElementById('profile-name');
                 const userNameDisplay = document.getElementById('user-name-display');
                 const medsTodayCount = document.getElementById('meds-today-count');
-                const remindersList = document.getElementById('reminders-list');
                 const noRemindersMessage = document.getElementById('no-reminders');
-                const historyList = document.getElementById('history-list');
                 const noHistoryMessage = document.getElementById('no-history');
-                const medNameInput = document.getElementById('med-name');
                 const medTimeInput = document.getElementById('med-time');
-                const medQuantityInput = document.getElementById('med-quantity');
                 const medPrescriptionDateInput = document.getElementById('med-prescription-date');
                 const medFrequencyInput = document.getElementById('med-frequency');
                 const newMedTitle = document.getElementById('new-med-title');
+                const medicationsContainer = document.getElementById('medications-container');
                 const alarmModal = document.getElementById('alarm-modal');
-                const btnCloseModal = document.getElementById('btn-close-modal');
-                const btnMarkAsTaken = document.getElementById('btn-mark-as-taken');
+                const alarmMedsList = document.getElementById('alarm-meds-list');
                 const alarmUserName = document.getElementById('alarm-user-name');
 
-                // Funções Principais
+                // --- 3. FUNÇÕES AUXILIARES ---
                 function navigateTo(screenId) {
                     screens.forEach(screen => screen.style.display = 'none');
                     const targetScreen = document.getElementById(screenId);
-                    if (targetScreen) {
-                        targetScreen.style.display = 'flex';
-                    }
+                    if (targetScreen) targetScreen.style.display = 'flex';
                 }
-
                 function saveProfiles() { localStorage.setItem('medTimeProfiles', JSON.stringify(profiles)); }
                 function saveReminders() { localStorage.setItem('medTimeReminders', JSON.stringify(reminders)); }
                 function saveHistory() { localStorage.setItem('medTimeHistory', JSON.stringify(history)); }
@@ -234,12 +284,42 @@
                     const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
                     const rawData = window.atob(base64);
                     const outputArray = new Uint8Array(rawData.length);
-                    for (let i = 0; i < rawData.length; ++i) {
-                        outputArray[i] = rawData.charCodeAt(i);
-                    }
+                    for (let i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
                     return outputArray;
                 }
 
+                // --- 4. LÓGICA DE MÚLTIPLOS MEDICAMENTOS (FORM) ---
+                function addMedicationRow(name = '', qty = '') {
+                    const row = document.createElement('div');
+                    row.className = 'med-row';
+                    row.innerHTML = `
+                        <input type="text" class="med-name-input" placeholder="Nome do remédio" value="${name}">
+                        <input type="number" class="med-qty-input" placeholder="Qtd" value="${qty}">
+                        <button type="button" class="btn-remove-row"><i class="ph ph-trash"></i></button>
+                    `;
+                    row.querySelector('.btn-remove-row').addEventListener('click', () => {
+                        if (medicationsContainer.children.length > 1) {
+                            row.remove();
+                        } else {
+                            row.querySelector('.med-name-input').value = '';
+                            row.querySelector('.med-qty-input').value = '';
+                        }
+                    });
+                    medicationsContainer.appendChild(row);
+                }
+
+                function resetNewMedForm() {
+                    editingReminderIndex = null;
+                    medicationsContainer.innerHTML = '';
+                    addMedicationRow();
+                    medTimeInput.value = '';
+                    medPrescriptionDateInput.value = '';
+                    medFrequencyInput.value = 'daily';
+                    newMedTitle.textContent = 'Insira os dados';
+                    btnSaveNewMed.textContent = 'Salvar';
+                }
+
+                // --- 5. FUNÇÕES DE PERFIL (CORRIGIDAS) ---
                 function renderProfileSelectionScreen() {
                     profileList.innerHTML = '';
                     if (profiles.length === 0) {
@@ -255,244 +335,6 @@
                     }
                 }
 
-                function renderMainScreen() {
-                    if (!currentProfileId) return navigateTo('profile-selection-screen');
-                    const profile = profiles.find(p => p.id === currentProfileId);
-                    if (!profile) return navigateTo('profile-selection-screen');
-                    const profileReminders = reminders[currentProfileId] || [];
-                    const todayKey = new Date().toISOString().split('T')[0];
-                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
-                    remindersList.innerHTML = '';
-                    userNameDisplay.textContent = profile.name;
-                    let totalDosesToday = 0;
-
-                    if (profileReminders.length === 0) {
-                        noRemindersMessage.style.display = 'block';
-                        medsTodayCount.textContent = 'Você não possui medicamentos cadastrados.';
-                    } else {
-                        noRemindersMessage.style.display = 'none';
-                        profileReminders.sort((a, b) => a.time.localeCompare(b.time));
-                        profileReminders.forEach((reminder, index) => {
-                            totalDosesToday++;
-                            const card = document.createElement('div');
-                            card.className = 'reminder-card';
-                            const isTaken = todayHistory.some(h => h.id === reminder.id && h.time === reminder.time);
-                            if (isTaken) card.classList.add('taken');
-                            card.innerHTML = `
-                                <div class="info">
-                                    <h3>${reminder.name}</h3>
-                                    <p>Horário: ${reminder.time} - Qtd: ${reminder.quantity}</p>
-                                    ${reminder.prescriptionDate ? `<p class="prescription-date">Receita de: ${new Date(reminder.prescriptionDate).toLocaleDateString()}</p>` : ''}
-                                </div>
-                                <div class="actions">
-                                    ${isTaken ? '<i class="ph ph-check-circle taken-icon"></i>' : ''}
-                                    <button class="edit-btn" data-index="${index}"><i class="ph ph-pencil-simple"></i></button>
-                                    <button class="delete-btn" data-index="${index}"><i class="ph ph-trash"></i></button>
-                                </div>
-                            `;
-                            remindersList.appendChild(card);
-                        });
-                        const takenCount = todayHistory.length;
-                        medsTodayCount.textContent = `Tomados hoje: ${takenCount} de ${totalDosesToday}`;
-                    }
-                }
-
-                function renderHistoryScreen() {
-                    if (!currentProfileId) return navigateTo('profile-selection-screen');
-                    historyList.innerHTML = '';
-                    const todayKey = new Date().toISOString().split('T')[0];
-                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
-                    if (todayHistory.length === 0) {
-                        noHistoryMessage.style.display = 'block';
-                    } else {
-                        noHistoryMessage.style.display = 'none';
-                        const grouped = todayHistory.reduce((acc, dose) => {
-                            acc[dose.name] = (acc[dose.name] || 0) + 1;
-                            return acc;
-                        }, {});
-                        for (const name in grouped) {
-                            const count = grouped[name];
-                            const item = document.createElement('div');
-                            item.className = 'history-item';
-                            item.innerHTML = `
-                                <h3>${name}</h3>
-                                <p>Remédios tomados: ${count}</p>
-                            `;
-                            historyList.appendChild(item);
-                        }
-                    }
-                }
-
-                function showAlarm(reminder) {
-                    currentAlarmReminder = reminder;
-                    const profile = profiles.find(p => p.id === currentProfileId);
-                    alarmUserName.textContent = profile ? profile.name + '!' : 'USER!';
-                    document.getElementById('alarm-med-name').textContent = reminder.name;
-                    document.getElementById('alarm-med-quantity').textContent = reminder.quantity;
-                    alarmModal.style.display = 'flex';
-
-                    // --- NOVO: Vibração ao invés de som ---
-                    // Verifica se o navegador suporta vibração
-                    if ('vibrate' in navigator) {
-                        // Padrão: Vibra 500ms, Pausa 200ms, Vibra 500ms
-                        navigator.vibrate([500, 200, 500]);
-                        console.log('📳 Vibrando dispositivo...');
-                    } else {
-                        console.log('📳 Este dispositivo não suporta vibração via web.');
-                    }
-                }
-                function checkReminders() {
-                    if (!currentProfileId) return;
-                    const profileReminders = reminders[currentProfileId] || [];
-                    const now = new Date();
-                    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-                    const todayKey = now.toISOString().split('T')[0];
-                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
-
-                    profileReminders.forEach(reminder => {
-                        if (reminder.time === currentTime) {
-                            const alreadyTaken = todayHistory.some(h => h.id === reminder.id && h.time === reminder.time);
-                            if (!alreadyTaken) {
-                                showAlarm(reminder);
-                                if (Notification.permission === 'granted') {
-                                    const profile = profiles.find(p => p.id === currentProfileId);
-                                    if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
-                                        navigator.serviceWorker.ready.then(reg => {
-                                            reg.showNotification(`Hora de ${profile.name} tomar ${reminder.name}!`, {
-                                                body: `Tomar ${reminder.quantity} comprimido(s).`,
-                                                icon: 'https://placehold.co/192x192/00695C/FFFFFF?text=MT',
-                                                tag: reminder.id.toString()
-                                            });
-                                        });
-                                    } else {
-                                        new Notification(`Hora de ${profile.name} tomar ${reminder.name}!`, {
-                                            body: `Tomar ${reminder.quantity} comprimido(s).`,
-                                            icon: 'https://placehold.co/192x192/00695C/FFFFFF?text=MT'
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    });
-                }
-
-                // FUNÇÃO CORRIGIDA: handlePushSubscription
-                async function handlePushSubscription(enable) {
-                    console.log('🔔 handlePushSubscription - Enable:', enable);
-
-                    if (enable) {
-                        // Verificar suporte
-                        if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-                            alert('❌ Seu navegador não suporta Notificações Push.');
-                            pushEnabled = false;
-                            togglePushNotifications.checked = false;
-                            savePushEnabled();
-                            return;
-                        }
-
-                        try {
-                            // Solicitar permissão
-                            console.log('📱 Solicitando permissão de notificação...');
-                            const permission = await Notification.requestPermission();
-                            console.log('📱 Permissão obtida:', permission);
-
-                            if (permission !== 'granted') {
-                                console.warn('⚠️ Permissão de notificação negada.');
-                                alert('❌ Permissão negada. As notificações push não funcionarão.');
-                                pushEnabled = false;
-                                togglePushNotifications.checked = false;
-                                savePushEnabled();
-                                return;
-                            }
-
-                            // Aguardar Service Worker estar pronto
-                            console.log('⏳ Aguardando Service Worker...');
-                            const reg = await navigator.serviceWorker.ready;
-                            console.log('✅ Service Worker pronto:', reg);
-
-                            // Verificar inscrição existente
-                            let subscription = await reg.pushManager.getSubscription();
-                            console.log('📋 Inscrição existente?', subscription ? 'Sim' : 'Não');
-
-                            if (subscription === null) {
-                                // Criar nova inscrição
-                                console.log('🆕 Criando nova inscrição push...');
-                                const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
-
-                                subscription = await reg.pushManager.subscribe({
-                                    userVisibleOnly: true,
-                                    applicationServerKey: convertedKey
-                                });
-                                console.log('✅ Nova inscrição criada com sucesso!');
-                            }
-
-                            // Salvar inscrição no localStorage
-                            const subscriptionJSON = JSON.stringify(subscription);
-                            localStorage.setItem('medTimePushSubscription', subscriptionJSON);
-                            console.log('💾 Inscrição salva no localStorage');
-                            console.log('📄 Dados da inscrição (primeiros 100 chars):', subscriptionJSON.substring(0, 100) + '...');
-
-                            pushEnabled = true;
-                            savePushEnabled();
-                            togglePushNotifications.checked = true;
-
-                            alert('✅ Notificações Push ativadas com sucesso!\n\n🔔 Agora você pode testar clicando no botão do sino.');
-
-                        } catch (error) {
-                            console.error('❌ Erro ao configurar push:', error);
-                            console.error('Stack trace:', error.stack);
-                            alert(`❌ Erro ao ativar notificações:\n\n${error.message}\n\nVerifique o console (F12) para mais detalhes.`);
-                            pushEnabled = false;
-                            togglePushNotifications.checked = false;
-                            savePushEnabled();
-                        }
-
-                    } else {
-                        // Desativar notificações
-                        console.log('🔕 Desativando notificações push...');
-                        pushEnabled = false;
-                        try {
-                            const reg = await navigator.serviceWorker.ready;
-                            const subscription = await reg.pushManager.getSubscription();
-                            if (subscription) {
-                                await subscription.unsubscribe();
-                                localStorage.removeItem('medTimePushSubscription');
-                                console.log('✅ Inscrição removida com sucesso');
-                            }
-                        } catch (e) {
-                            console.error('❌ Erro ao remover inscrição:', e);
-                        }
-                        savePushEnabled();
-                        togglePushNotifications.checked = false;
-                    }
-                }
-
-                function resetNewMedForm() {
-                    editingReminderIndex = null;
-                    medNameInput.value = '';
-                    medTimeInput.value = '';
-                    medQuantityInput.value = '';
-                    medPrescriptionDateInput.value = '';
-                    medFrequencyInput.value = 'daily';
-                    newMedTitle.textContent = 'Insira os dados do novo medicamento';
-                    btnSaveNewMed.textContent = 'Salvar';
-                }
-
-                function startEditingReminder(index) {
-                    editingReminderIndex = index;
-                    const profileReminders = reminders[currentProfileId] || [];
-                    const reminder = profileReminders[index];
-                    if (!reminder) return;
-                    medNameInput.value = reminder.name;
-                    medTimeInput.value = reminder.time;
-                    medQuantityInput.value = reminder.quantity;
-                    medPrescriptionDateInput.value = reminder.prescriptionDate || '';
-                    medFrequencyInput.value = reminder.frequency || 'daily';
-                    newMedTitle.textContent = 'Altere os dados do medicamento';
-                    btnSaveNewMed.textContent = 'Atualizar';
-                    navigateTo('new-med-screen');
-                }
-
                 function selectProfile(profileId) {
                     currentProfileId = profileId;
                     localStorage.setItem('medTimeCurrentProfileId', profileId);
@@ -500,6 +342,7 @@
                     renderMainScreen();
                 }
 
+                // ESTA FUNÇÃO FALTAVA NA RESPOSTA ANTERIOR:
                 function saveNewProfile() {
                     const name = profileNameInput.value.trim();
                     if (name) {
@@ -517,6 +360,7 @@
                     }
                 }
 
+                // ESTA TAMBÉM:
                 function switchProfile() {
                     currentProfileId = null;
                     localStorage.removeItem('medTimeCurrentProfileId');
@@ -524,237 +368,283 @@
                     renderProfileSelectionScreen();
                 }
 
-                function setupApp() {
-                    if ('Notification' in window && Notification.permission === 'granted') {
-                        pushEnabled = true;
+                // --- 6. RENDERIZAÇÃO (MAIN E HISTÓRICO) ---
+                function renderMainScreen() {
+                    if (!currentProfileId) return navigateTo('profile-selection-screen');
+                    const profile = profiles.find(p => p.id === currentProfileId);
+                    if (!profile) return navigateTo('profile-selection-screen');
+
+                    const profileReminders = reminders[currentProfileId] || [];
+                    const todayKey = new Date().toISOString().split('T')[0];
+                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
+
+                    remindersList.innerHTML = '';
+                    userNameDisplay.textContent = profile.name;
+                    let totalDosesToday = 0;
+
+                    if (profileReminders.length === 0) {
+                        noRemindersMessage.style.display = 'block';
+                        medsTodayCount.textContent = 'Você não possui medicamentos cadastrados.';
+                    } else {
+                        noRemindersMessage.style.display = 'none';
+                        profileReminders.sort((a, b) => a.time.localeCompare(b.time));
+
+                        profileReminders.forEach((reminder, index) => {
+                            let medsList = reminder.meds;
+                            if (!medsList) medsList = [{ name: reminder.name, quantity: reminder.quantity }];
+                            totalDosesToday += medsList.length;
+
+                            const card = document.createElement('div');
+                            card.className = 'reminder-card';
+                            const isTaken = todayHistory.some(h => h.id === reminder.id && h.time === reminder.time);
+                            if (isTaken) card.classList.add('taken');
+
+                            const medsDisplayString = medsList.map(m => `<strong>${m.name}</strong> (${m.quantity})`).join('<br>');
+
+                            card.innerHTML = `
+                                <div class="info">
+                                    <h3 style="font-size: 1rem; margin-bottom: 5px;">${reminder.time}</h3>
+                                    <div style="color: var(--primary-color); font-size: 1.1rem;">${medsDisplayString}</div>
+                                    ${reminder.prescriptionDate ? `<p class="prescription-date">Receita de: ${new Date(reminder.prescriptionDate).toLocaleDateString()}</p>` : ''}
+                                </div>
+                                <div class="actions">
+                                    ${isTaken ? '<i class="ph ph-check-circle taken-icon" style="color: var(--primary-color); font-size: 1.5rem;"></i>' : ''}
+                                    <button class="edit-btn" data-index="${index}"><i class="ph ph-pencil-simple"></i></button>
+                                    <button class="delete-btn" data-index="${index}"><i class="ph ph-trash"></i></button>
+                                </div>
+                            `;
+                            remindersList.appendChild(card);
+                        });
+                        const takenCount = todayHistory.length;
+                        medsTodayCount.textContent = `Agendamentos hoje: ${profileReminders.length}`;
+                    }
+                }
+
+                function renderHistoryScreen() {
+                    if (!currentProfileId) return navigateTo('profile-selection-screen');
+                    historyList.innerHTML = '';
+                    const todayKey = new Date().toISOString().split('T')[0];
+                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
+
+                    if (todayHistory.length === 0) {
+                        noHistoryMessage.style.display = 'block';
+                    } else {
+                        noHistoryMessage.style.display = 'none';
+                        todayHistory.forEach(entry => {
+                            const item = document.createElement('div');
+                            item.className = 'history-item';
+                            const medsNames = entry.meds ? entry.meds.map(m => m.name).join(', ') : entry.name;
+                            item.innerHTML = `<h3>${entry.time}</h3><p>${medsNames}</p>`;
+                            historyList.appendChild(item);
+                        });
+                    }
+                }
+
+                function startEditingReminder(index) {
+                    editingReminderIndex = index;
+                    const profileReminders = reminders[currentProfileId] || [];
+                    const reminder = profileReminders[index];
+                    if (!reminder) return;
+
+                    let medsList = reminder.meds;
+                    if (!medsList) medsList = [{ name: reminder.name, quantity: reminder.quantity }];
+
+                    medicationsContainer.innerHTML = '';
+                    medsList.forEach(m => addMedicationRow(m.name, m.quantity));
+
+                    medTimeInput.value = reminder.time;
+                    medPrescriptionDateInput.value = reminder.prescriptionDate || '';
+                    medFrequencyInput.value = reminder.frequency || 'daily';
+                    newMedTitle.textContent = 'Editar Medicamentos';
+                    btnSaveNewMed.textContent = 'Atualizar';
+                    navigateTo('new-med-screen');
+                }
+
+                // --- 7. LÓGICA DE ALARME E NOTIFICAÇÃO ---
+                function showAlarm(reminder) {
+                    currentAlarmReminder = reminder;
+                    const profile = profiles.find(p => p.id === currentProfileId);
+                    alarmUserName.textContent = profile ? profile.name + '!' : 'USER!';
+
+                    alarmMedsList.innerHTML = '';
+                    let medsList = reminder.meds;
+                    if (!medsList) medsList = [{ name: reminder.name, quantity: reminder.quantity }];
+
+                    medsList.forEach(m => {
+                        const item = document.createElement('div');
+                        item.className = 'alarm-med-list-item';
+                        item.innerHTML = `<span>${m.name}</span> <strong>Qtd: ${m.quantity}</strong>`;
+                        alarmMedsList.appendChild(item);
+                    });
+
+                    alarmModal.style.display = 'flex';
+
+                    if ('vibrate' in navigator) navigator.vibrate([500, 200, 500]);
+                    try { alarmSound.currentTime = 0; alarmSound.play().catch(() => { }); } catch (e) { }
+                }
+
+                function checkReminders() {
+                    if (!currentProfileId) return;
+                    const profileReminders = reminders[currentProfileId] || [];
+                    const now = new Date();
+                    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                    const todayKey = now.toISOString().split('T')[0];
+                    const todayHistory = (history[currentProfileId] && history[currentProfileId][todayKey]) || [];
+
+                    profileReminders.forEach(reminder => {
+                        if (reminder.time === currentTime) {
+                            const alreadyTaken = todayHistory.some(h => h.id === reminder.id && h.time === reminder.time);
+                            if (!alreadyTaken) {
+                                showAlarm(reminder);
+                                if (Notification.permission === 'granted') {
+                                    new Notification(`Hora de tomar medicamentos!`);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                async function handlePushSubscription(enable) {
+                    togglePushNotifications.checked = pushEnabled;
+                    if (enable) {
+                        try {
+                            const perm = await Notification.requestPermission();
+                            if (perm === 'granted') {
+                                const reg = await navigator.serviceWorker.ready;
+                                let sub = await reg.pushManager.getSubscription();
+                                if (!sub) {
+                                    sub = await reg.pushManager.subscribe({
+                                        userVisibleOnly: true,
+                                        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                                    });
+                                }
+                                localStorage.setItem('medTimePushSubscription', JSON.stringify(sub));
+                                pushEnabled = true;
+                                alert("Notificações Ativadas!");
+                            } else {
+                                pushEnabled = false;
+                                alert("Permissão negada.");
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            pushEnabled = false;
+                        }
                     } else {
                         pushEnabled = false;
+                        localStorage.removeItem('medTimePushSubscription');
                     }
                     savePushEnabled();
-
-                    setTimeout(() => {
-                        if (currentProfileId && profiles.find(p => p.id === currentProfileId)) {
-                            navigateTo('main-screen');
-                            renderMainScreen();
-                        } else {
-                            navigateTo('profile-selection-screen');
-                            renderProfileSelectionScreen();
-                        }
-                    }, 1500);
-
-                    if (notificationInterval) clearInterval(notificationInterval);
-                    notificationInterval = setInterval(checkReminders, 60000);
+                    togglePushNotifications.checked = pushEnabled;
                 }
 
-                // FUNÇÃO CORRIGIDA: enviarPush (agora como parte do btnTestAlarm)
                 async function enviarPush() {
-                    console.log('🔔 === INICIANDO TESTE DE PUSH ===');
-
-                    // 1. Verificar se há inscrição salva
-                    const subscriptionString = localStorage.getItem('medTimePushSubscription');
-                    console.log('📋 Verificando localStorage...');
-                    console.log('Inscrição encontrada?', subscriptionString ? '✅ SIM' : '❌ NÃO');
-
-                    if (!subscriptionString) {
-                        console.error('❌ Nenhuma inscrição encontrada no localStorage');
-                        alert('❌ Inscrição de push não encontrada.\n\n⚠️ PASSOS NECESSÁRIOS:\n\n1. Vá em Configurações ⚙️\n2. Ative "Notificações Push"\n3. Conceda a permissão quando solicitado\n4. Volte e tente novamente\n\n💡 A inscrição precisa ser criada primeiro!');
-                        return;
-                    }
-
+                    const subStr = localStorage.getItem('medTimePushSubscription');
+                    if (!subStr) return alert("Ative as notificações primeiro!");
                     try {
-                        // 2. Parsear a inscrição
-                        const subscription = JSON.parse(subscriptionString);
-                        console.log('📦 Inscrição parseada com sucesso');
-                        console.log('Endpoint:', subscription.endpoint);
-
-                        // 3. Preparar payload
-                        const payload = {
-                            name: 'Medicamento Teste',
-                            quantity: '1'
-                        };
-                        console.log('📤 Payload preparado:', payload);
-
-                        // 4. Enviar para a API da Vercel
-                        console.log('🌐 Enviando requisição para: /api/send-push');
-                        const response = await fetch('/api/send-push', {
+                        await fetch('/api/send-push', {
                             method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ subscription, payload })
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ subscription: JSON.parse(subStr), payload: { name: 'Teste', quantity: '1' } })
                         });
-
-                        console.log('📡 Resposta recebida');
-                        console.log('Status:', response.status, response.statusText);
-
-                        // 5. Processar resposta
-                        const data = await response.json();
-                        console.log('📥 Dados da resposta:', data);
-
-                        if (response.ok) {
-                            console.log('✅ SUCESSO! Push enviado');
-                            alert('✅ Push enviado com sucesso!\n\n🔔 Você deve receber uma notificação em breve.\n\n💡 DICA: Feche o app para testar se funciona com ele fechado!');
-                        } else {
-                            throw new Error(data.message || data.error || 'Erro desconhecido do servidor');
-                        }
-
-                    } catch (error) {
-                        console.error('❌ ERRO COMPLETO:', error);
-                        console.error('Tipo do erro:', error.name);
-                        console.error('Mensagem:', error.message);
-                        console.error('Stack:', error.stack);
-
-                        let errorMessage = `❌ Falha ao enviar push:\n\n${error.message}\n\n`;
-
-                        if (error.message.includes('fetch')) {
-                            errorMessage += "⚠️ Verifique sua conexão ou se o servidor backend está rodando.";
-                        }
-                        alert(errorMessage);
-                    }
+                        alert("Push enviado! Feche o app para testar.");
+                    } catch (e) { alert("Erro: " + e.message); }
                 }
 
-                // --- Event Listeners (Ações do Usuário) ---
+                // --- 8. CONFIGURAÇÃO INICIAL E EVENT LISTENERS ---
 
-                // Navegação de Perfil
+                // Configurações
+                if (btnGoToSettings) {
+                    btnGoToSettings.addEventListener('click', () => {
+                        togglePushNotifications.checked = pushEnabled;
+                        navigateTo('settings-screen');
+                    });
+                }
+                if (btnSettingsReturn) btnSettingsReturn.addEventListener('click', () => navigateTo('main-screen'));
+                if (togglePushNotifications) togglePushNotifications.addEventListener('change', () => handlePushSubscription(togglePushNotifications.checked));
+
+                // Perfil
                 btnGoToNewProfile.addEventListener('click', () => navigateTo('new-profile-screen'));
-                btnCancelNewProfile.addEventListener('click', () => {
-                    navigateTo('profile-selection-screen');
-                    renderProfileSelectionScreen();
-                });
+                btnCancelNewProfile.addEventListener('click', () => { navigateTo('profile-selection-screen'); renderProfileSelectionScreen(); });
                 btnSaveNewProfile.addEventListener('click', saveNewProfile);
                 btnSwitchProfile.addEventListener('click', switchProfile);
 
-                // Navegação de Medicamento
-                btnAddNewMed.addEventListener('click', () => {
-                    resetNewMedForm();
-                    navigateTo('new-med-screen');
-                });
-                btnCancelNewMed.addEventListener('click', () => {
-                    resetNewMedForm();
-                    navigateTo('main-screen');
-                });
+                // Medicamentos
+                btnAddNewMed.addEventListener('click', () => { resetNewMedForm(); navigateTo('new-med-screen'); });
+                btnCancelNewMed.addEventListener('click', () => { resetNewMedForm(); navigateTo('main-screen'); });
+                btnAddMedRow.addEventListener('click', () => addMedicationRow());
 
-                // Salvar Medicamento
                 btnSaveNewMed.addEventListener('click', () => {
-                    const name = medNameInput.value.trim();
                     const time = medTimeInput.value;
-                    const quantity = medQuantityInput.value;
                     const prescriptionDate = medPrescriptionDateInput.value;
                     const frequency = medFrequencyInput.value;
+                    const rows = document.querySelectorAll('.med-row');
+                    const meds = [];
+                    rows.forEach(row => {
+                        const name = row.querySelector('.med-name-input').value.trim();
+                        const quantity = row.querySelector('.med-qty-input').value;
+                        if (name && quantity) meds.push({ name, quantity });
+                    });
 
-                    if (name && time && quantity) {
+                    if (time && meds.length > 0) {
                         if (!reminders[currentProfileId]) reminders[currentProfileId] = [];
-
-                        const reminderData = {
-                            name,
-                            time,
-                            quantity,
-                            prescriptionDate,
-                            frequency
-                        };
-
+                        const reminderData = { time, meds, prescriptionDate, frequency };
                         if (editingReminderIndex !== null) {
-                            // Editando
-                            const originalReminder = reminders[currentProfileId][editingReminderIndex];
-                            reminderData.id = originalReminder.id;
+                            reminderData.id = reminders[currentProfileId][editingReminderIndex].id;
                             reminders[currentProfileId][editingReminderIndex] = reminderData;
                         } else {
-                            // Novo
                             reminderData.id = Date.now();
                             reminders[currentProfileId].push(reminderData);
                         }
-
-                        saveReminders();
-                        renderMainScreen();
-                        navigateTo('main-screen');
-                        resetNewMedForm();
-
-                    } else {
-                        alert('Por favor, preencha nome, horário e quantidade.');
-                    }
+                        saveReminders(); renderMainScreen(); navigateTo('main-screen'); resetNewMedForm();
+                    } else { alert('Preencha o horário e pelo menos um medicamento.'); }
                 });
 
-                // Ações na Lista (Editar e Excluir)
+                // Lista e Histórico
                 remindersList.addEventListener('click', (e) => {
-                    const deleteButton = e.target.closest('.delete-btn');
-                    const editButton = e.target.closest('.edit-btn');
-
-                    if (editButton) {
-                        const index = editButton.getAttribute('data-index');
-                        startEditingReminder(index);
-                    } else if (deleteButton) {
-                        const index = deleteButton.getAttribute('data-index');
-                        if (confirm(`Tem certeza que deseja excluir este lembrete?`)) {
-                            reminders[currentProfileId].splice(index, 1);
-                            saveReminders();
-                            renderMainScreen();
-                        }
-                    }
+                    const del = e.target.closest('.delete-btn');
+                    const edit = e.target.closest('.edit-btn');
+                    if (edit) startEditingReminder(edit.dataset.index);
+                    if (del && confirm('Excluir?')) { reminders[currentProfileId].splice(del.dataset.index, 1); saveReminders(); renderMainScreen(); }
                 });
 
-                // Histórico
-                btnGoToHistory.addEventListener('click', () => {
-                    renderHistoryScreen();
-                    navigateTo('history-screen');
-                });
-                btnHistoryReturn.addEventListener('click', () => navigateTo('main-screen'));
+                if (btnGoToHistory) btnGoToHistory.addEventListener('click', () => { renderHistoryScreen(); navigateTo('history-screen'); });
+                if (btnHistoryReturn) btnHistoryReturn.addEventListener('click', () => navigateTo('main-screen'));
 
-                // Configurações e Push
-                btnGoToSettings.addEventListener('click', () => {
-                    togglePushNotifications.checked = pushEnabled;
-                    navigateTo('settings-screen');
-                });
-                btnSettingsReturn.addEventListener('click', () => navigateTo('main-screen'));
-
-                togglePushNotifications.addEventListener('change', () => {
-                    handlePushSubscription(togglePushNotifications.checked);
-                });
-
-                // Botão de Teste (Sino): Tenta o Push Backend + Mostra Alarme Visual
+                // Alarme
                 btnTestAlarm.addEventListener('click', () => {
-                    // Mostra o alarme visualmente para teste local
-                    showAlarm({ id: 'test', name: 'Teste Local', quantity: '1', time: '00:00' });
-                    // Dispara a função de teste de backend
+                    showAlarm({ id: 'test', meds: [{ name: 'Teste Local', quantity: '1' }], time: '00:00' });
                     enviarPush();
                 });
-
-                // Modal de Alarme
-                btnCloseModal.addEventListener('click', () => {
-                    alarmModal.style.display = 'none';
-                    currentAlarmReminder = null;
-                });
-
+                btnCloseModal.addEventListener('click', () => { alarmModal.style.display = 'none'; currentAlarmReminder = null; alarmSound.pause(); });
                 btnMarkAsTaken.addEventListener('click', () => {
                     if (currentAlarmReminder && currentProfileId && currentAlarmReminder.id !== 'test') {
                         const todayKey = new Date().toISOString().split('T')[0];
-
                         if (!history[currentProfileId]) history[currentProfileId] = {};
                         if (!history[currentProfileId][todayKey]) history[currentProfileId][todayKey] = [];
-
-                        const alreadyTaken = history[currentProfileId][todayKey].some(h => h.id === currentAlarmReminder.id && h.time === currentAlarmReminder.time);
-
-                        if (!alreadyTaken) {
-                            history[currentProfileId][todayKey].push({
-                                ...currentAlarmReminder,
-                                takenAt: new Date().toISOString()
-                            });
-                            saveHistory();
-                            renderMainScreen();
+                        if (!history[currentProfileId][todayKey].some(h => h.id === currentAlarmReminder.id && h.time === currentAlarmReminder.time)) {
+                            history[currentProfileId][todayKey].push({ ...currentAlarmReminder, takenAt: new Date().toISOString() });
+                            saveHistory(); renderMainScreen();
                         }
                     }
-                    alarmModal.style.display = 'none';
-                    currentAlarmReminder = null;
+                    alarmModal.style.display = 'none'; currentAlarmReminder = null; alarmSound.pause();
                 });
 
-                // Inicia o aplicativo
-                setupApp();
+                // Inicialização
+                document.getElementById('initial-screen').addEventListener('click', () => {
+                    if (currentProfileId && profiles.find(p => p.id === currentProfileId)) { navigateTo('main-screen'); renderMainScreen(); }
+                    else { navigateTo('profile-selection-screen'); renderProfileSelectionScreen(); }
+                });
+
+                setTimeout(() => {
+                    if (currentProfileId && profiles.find(p => p.id === currentProfileId)) { navigateTo('main-screen'); renderMainScreen(); }
+                    else { navigateTo('profile-selection-screen'); renderProfileSelectionScreen(); }
+                }, 1500);
+
+                notificationInterval = setInterval(checkReminders, 60000);
 
             } catch (error) {
-                console.error("Ocorreu um erro ao iniciar o aplicativo:", error);
-                document.body.innerHTML = `<div style="padding: 20px; text-align: center; font-family: sans-serif;">
-                                    <h1>Ocorreu um erro</h1><p>Houve um problema ao carregar o MedTime. Por favor, tente recarregar a página.</p>
-                                    <p style="color: grey; font-size: 0.8em;">Detalhes: ${error.message}</p>
-                                </div>`;
+                console.error("Erro fatal:", error);
+                document.body.innerHTML = `<div style="padding:20px;text-align:center;"><h1>Erro</h1><p>${error.message}</p></div>`;
             }
         });
     </script>
