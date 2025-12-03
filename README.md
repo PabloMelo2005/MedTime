@@ -1,6 +1,6 @@
 # 💊 MedTime - Seu Assistente de Medicação
 
-![Status do Projeto](https://img.shields.io/badge/status-em_desenvolvimento-orange)
+![Status do Projeto](https://img.shields.io/badge/status-beta%201.0-blue)
 ![Plataforma](https://img.shields.io/badge/plataforma-web%20|%20android-blue)
 ![Licença](https://img.shields.io/badge/licença-MIT-green)
 
