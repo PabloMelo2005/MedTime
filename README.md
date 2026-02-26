@@ -9,11 +9,10 @@ O **MedTime** é uma aplicação web progressiva (PWA) projetada para ajudar usu
 ## ✨ Funcionalidades
 
 * **👥 Múltiplos Perfis:** Gerencie a medicação de vários usuários.
-* **🔔 Notificações Push & Sons:** Alertas visuais e sonoros (pasta `Sounds/`) para garantir que você ouça o lembrete.
+* **🔔 Notificações Push & Sons:** Alertas visuais para garantir que você ouça o lembrete.
 * **✏️ Gestão Completa:** Adicione, edite e exclua lembretes e perfis.
 * **📶 Suporte Offline:** Funciona sem internet graças ao Service Worker (`pwabuilder-sw.js`).
 * **☁️ Integração com API:** Estrutura pronta para funções serverless e backend (pasta `api/`).
-* **📱 PWA Instalável:** Pode ser instalado como app nativo no Android.
 
 ## 🛠️ Tecnologias Utilizadas
 
